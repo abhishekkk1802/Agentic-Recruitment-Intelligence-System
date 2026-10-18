@@ -31,6 +31,25 @@ This project demonstrates two major AI system implementations:
 - ✅ **Match Reasoning Engine** - Explainable AI with detailed candidate analysis
 - ✅ **Production-Ready Output** - Standard JSON format with comprehensive match details
 
+### **Phase 3: LangGraph Conversational Agent** 🚀 **NEW IMPLEMENTATION**
+**Part A: Agent Architecture (40%)**
+- ✅ **LangGraph Workflow** - State-managed conversational AI with multi-step reasoning
+- ✅ **Conversation Tracking** - Thread-based persistent conversation history
+- ✅ **Intent Classification** - Natural language understanding for job matching queries
+- ✅ **Tool Integration** - Seamless integration of all RAG and file system tools
+
+**Part B: Interactive Features (30%)**
+- ✅ **Natural Language Processing** - "Find candidates with React and 3+ years experience"
+- ✅ **Multi-turn Conversations** - Context-aware follow-up questions and refinements
+- ✅ **Dynamic Criteria Adjustment** - Real-time requirement modifications
+- ✅ **Iterative Refinement** - Human-guided search optimization
+
+**Part C: Advanced Capabilities (30%)**
+- ✅ **Multi-Round Screening** - Progressive 3-stage candidate filtering (Initial → Deep Analysis → Final)
+- ✅ **Enhanced Explainability** - Detailed match reports with strengths/gaps analysis
+- ✅ **Interview Questions** - AI-generated screening questions based on candidate profiles
+- ✅ **Human-in-the-Loop** - Interactive approval gates and feedback integration
+
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
@@ -74,13 +93,28 @@ source venv/bin/activate
 python llm_file_assistant.py
 ```
 
-#### **Option B: RAG Job Matching System**
+#### **Option B: RAG Job Matching System (Legacy)**
 ```bash
 # Run comprehensive system test
 python test_rag_system.py
 
 # Or run Jupyter analysis notebook
 jupyter notebook rag_analysis.ipynb
+```
+
+#### **Option C: LangGraph Conversational Agent** ⭐ **RECOMMENDED**
+```bash
+# Interactive conversational agent
+python matching_agent.py --interactive --resume-dir examples/resumes
+
+# Run demonstration with examples
+python demo_matching_agent.py --examples
+
+# Performance benchmarking
+python demo_matching_agent.py --benchmark
+
+# Comprehensive validation
+python test_matching_agent.py
 ```
 
 ## 💬 Usage Examples
@@ -177,11 +211,20 @@ LLM-Powered File System Assistant/
 │   ├── llm_file_assistant.py    # LLM integration & chat interface (Part B)
 │   └── requirements.txt         # Python dependencies
 │
-├── 📁 RAG Job Matching System ⭐ MAIN PROJECT
+├── 📁 RAG Job Matching System (Legacy Implementation)
 │   ├── resume_rag.py            # Document processing & vector storage (Part A - 50%)
 │   ├── job_matcher.py           # Semantic job matching engine (Part B - 50%)
 │   ├── test_rag_system.py       # Comprehensive system testing
 │   └── rag_analysis.ipynb       # Performance analysis & experimentation
+│
+├── 📁 LangGraph Conversational Agent ⭐ **NEW MAIN PROJECT**
+│   ├── matching_agent.py        # Main conversational agent implementation
+│   ├── agent_state.py          # State management and conversation tracking
+│   ├── agent_tools.py          # Tool wrappers and specialized functions
+│   ├── agent_workflow.py       # LangGraph workflow and node definitions
+│   ├── screening_pipeline.py   # Multi-round screening implementation
+│   ├── demo_matching_agent.py  # Interactive demonstration and examples
+│   └── test_matching_agent.py  # Comprehensive agent validation suite
 │
 ├── 📁 Dataset (Exceeds Requirements)
 │   └── examples/
@@ -207,7 +250,46 @@ LLM-Powered File System Assistant/
 
 ## 🛠️ Core Components
 
-### 🎯 **PRIMARY: RAG Job Matching System**
+### 🚀 **PRIMARY: LangGraph Conversational Agent** ⭐ **NEW**
+
+#### matching_agent.py - Main Conversational Agent
+```python
+from matching_agent import LangGraphMatchingAgent, InteractiveChatSession
+
+# Initialize conversational agent
+agent = LangGraphMatchingAgent(
+    config={
+        "model": "gpt-4o-mini",
+        "embedding_model": "openai",
+        "max_iterations": 10,
+        "top_k": 10
+    }
+)
+
+# Initialize with resume data
+agent.initialize_with_resumes("examples/resumes")
+
+# Process natural language queries
+response = agent.process_query(
+    "Find me candidates with React and 3+ years experience who also know Python"
+)
+
+print(f"Response: {response.final_response}")
+print(f"Found {len(response.candidate_matches)} qualified candidates")
+
+# Start interactive chat session
+chat = InteractiveChatSession(agent)
+chat.start()
+```
+
+#### Key Features:
+- **Natural Language Understanding**: "Compare John Doe and Jane Smith side by side"
+- **Multi-turn Conversations**: Context-aware follow-up questions and refinements
+- **Human-in-the-Loop**: Interactive approval gates and feedback integration
+- **Multi-Round Screening**: 3-stage progressive filtering with hire/no-hire recommendations
+- **Explainable AI**: Detailed reasoning for all ranking and filtering decisions
+
+### 📊 **LEGACY: RAG Job Matching System**
 
 #### resume_rag.py - Document Processing & Vector Storage
 ```python
