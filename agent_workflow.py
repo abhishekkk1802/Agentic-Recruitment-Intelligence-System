@@ -156,7 +156,8 @@ class MatchingAgentWorkflow:
         self,
         llm: Optional[ChatOpenAI] = None,
         checkpointer: Optional[Any] = None,
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
+        mcp_client: Optional[Any] = None
     ):
         """
         Initialize the matching agent workflow.
@@ -167,9 +168,26 @@ class MatchingAgentWorkflow:
                 in-memory saver, which still enables multi-turn refinement
                 within a process.
             config: Configuration parameters
+            mcp_client: Optional MCP client. When provided, file-system
+                tools (read, list, search, write, watch, batch) are routed
+                through the MCP server instead of called directly. This
+                demonstrates the Model Context Protocol integration without
+                changing the graph structure — the tool names and schemas
+                match, so ToolNode and tools_condition work unchanged.
         """
         self.config = config or {}
+        self.mcp_client = mcp_client
         
+        # Determine the tool set for file operations. When an MCP client is
+        # provided, file operations go through the MCP server; otherwise the
+        # direct fs_tools-backed tools from agent_tools are used.
+        if mcp_client is not None:
+            self._file_tools = mcp_client.get_all_tools()
+            logger.info("File operations routed through MCP server (%d tools)",
+                        len(self._file_tools))
+        else:
+            self._file_tools = ALL_TOOLS
+
         # Initialize LLM
         self.llm = llm or ChatOpenAI(
             model=self.config.get("model", "gpt-4o-mini"),
@@ -179,9 +197,16 @@ class MatchingAgentWorkflow:
 
         # Bind the tool surface to the model. Without this, `tools_condition`
         # can never fire and the ToolNode is unreachable, which is what left
-        # the tool layer dead in the previous revision.
+        # the tool layer dead in the previous revision. When MCP is active,
+        # the MCP-backed file tools replace the direct ones in the bound set.
+        tools_to_bind = list(ALL_TOOLS)
+        if mcp_client is not None:
+            mcp_tool_names = {t.name for t in self._file_tools}
+            tools_to_bind = [t for t in ALL_TOOLS if t.name not in mcp_tool_names]
+            tools_to_bind.extend(self._file_tools)
+
         try:
-            self.llm_with_tools = self.llm.bind_tools(ALL_TOOLS)
+            self.llm_with_tools = self.llm.bind_tools(tools_to_bind)
         except Exception as exc:
             logger.warning("Could not bind tools to the LLM: %s", exc)
             self.llm_with_tools = self.llm
@@ -207,7 +232,8 @@ class MatchingAgentWorkflow:
         self.graph = self._build_graph()
         
         logger.info(
-            "MatchingAgentWorkflow initialized successfully (hitl=%s)", self.enable_hitl
+            "MatchingAgentWorkflow initialized successfully (hitl=%s, mcp=%s)",
+            self.enable_hitl, self.mcp_client is not None
         )
     
     def _build_graph(self):
@@ -243,8 +269,11 @@ class MatchingAgentWorkflow:
         builder.add_node("index_check", self._index_check_node)
 
         # ---- File operations branch (Milestone 1 tools) ------------------
+        # When an MCP client is connected, the ToolNode dispatches file
+        # operations to the MCP server process; otherwise it calls the
+        # fs_tools functions directly.
         builder.add_node("file_agent", self._file_agent_node)
-        builder.add_node("file_tools", ToolNode(ALL_TOOLS))
+        builder.add_node("file_tools", ToolNode(self._file_tools))
 
         # ---- Specialised analysis (Part B.1) ----------------------------
         builder.add_node("compare_candidates", self._compare_candidates_node)

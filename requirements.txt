@@ -56,3 +56,6 @@ typing-extensions==4.15.0      # Type system extensions
 tqdm==4.67.3                   # Progress bars for loops
 click==8.3.3                   # Command line interface creation
 
+# MCP (Model Context Protocol) — Milestone 4
+mcp==2.3.0                     # MCP SDK for server + client (JSON-RPC 2.0 over stdio)
+grandalf==0.8                  # Graph layout engine (used by langchain draw_ascii)

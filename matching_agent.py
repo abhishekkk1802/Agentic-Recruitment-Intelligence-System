@@ -108,6 +108,16 @@ from agent_tools import initialize_tools, get_tools_by_category
 from resume_rag import ResumeRAG
 from job_matcher import JobMatcher
 
+# MCP client is optional — the agent works with direct tools by default.
+# When config["use_mcp"] is True, file operations are routed through the
+# filesystem MCP server instead, demonstrating the Model Context Protocol.
+try:
+    from mcp_client import MCPClient
+    _MCP_AVAILABLE = True
+except ImportError:
+    MCPClient = None  # type: ignore[misc,assignment]
+    _MCP_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -134,14 +144,18 @@ class LangGraphMatchingAgent:
             checkpoint_db: Path to checkpoint database (None for in-memory)
         """
         self.config = config or {}
+        self.mcp_client = None  # set by _initialize_mcp when use_mcp is True
         
         # Initialize core components
         self._initialize_rag_system()
         self._initialize_llm()
         self._initialize_checkpointer(checkpoint_db)
+        if self.config.get("use_mcp"):
+            self._initialize_mcp()
         self._initialize_workflow()
         
-        logger.info("LangGraphMatchingAgent initialized successfully")
+        logger.info("LangGraphMatchingAgent initialized successfully (mcp=%s)",
+                    self.config.get("use_mcp", False))
     
     def _initialize_rag_system(self) -> None:
         """Initialize RAG and JobMatcher instances."""
@@ -210,6 +224,38 @@ class LangGraphMatchingAgent:
             logger.error(f"Failed to initialize checkpointer: {e}")
             raise
     
+    def _initialize_mcp(self) -> None:
+        """
+        Start the filesystem MCP server and connect the client.
+
+        When MCP mode is enabled, file-system operations (read, list, write,
+        search, watch, batch) are mediated by the MCP server process rather
+        than called directly. The workflow receives the MCP-backed tools and
+        uses them for the file_tools node, so the graph structure is unchanged.
+        """
+        if not _MCP_AVAILABLE:
+            logger.warning(
+                "MCP mode requested but mcp_client is not available. "
+                "Falling back to direct tools."
+            )
+            self.config["use_mcp"] = False
+            return
+
+        try:
+            self.mcp_client = MCPClient()
+            self.mcp_client.start()
+            logger.info("MCP client connected, file tools now MCP-mediated")
+
+            discovered = self.mcp_client.list_tools()
+            logger.info("MCP server exposes %d tools: %s",
+                        len(discovered),
+                        ", ".join(t["name"] for t in discovered))
+        except Exception as e:
+            logger.error("Failed to initialize MCP client: %s", e)
+            logger.warning("Falling back to direct tools")
+            self.mcp_client = None
+            self.config["use_mcp"] = False
+
     def _initialize_workflow(self) -> None:
         """
         Initialize the LangGraph workflow.
@@ -240,7 +286,8 @@ class LangGraphMatchingAgent:
             workflow = MatchingAgentWorkflow(
                 llm=self.llm,
                 checkpointer=self.checkpointer,
-                config=self.config
+                config=self.config,
+                mcp_client=self.mcp_client,
             )
             self.workflow = workflow
             self.graph = workflow.graph
@@ -795,7 +842,8 @@ class LangGraphMatchingAgent:
                 "config": {
                     "model": self.config.get("model", "gpt-4o-mini"),
                     "embedding_model": self.config.get("embedding_model", "openai"),
-                    "collection_name": self.config.get("collection_name", "matching_agent_collection")
+                    "collection_name": self.config.get("collection_name", "matching_agent_collection"),
+                    "use_mcp": self.config.get("use_mcp", False),
                 },
                 "capabilities": [
                     "job_matching",
@@ -803,9 +851,18 @@ class LangGraphMatchingAgent:
                     "interview_questions",
                     "multi_round_screening",
                     "human_feedback_loops",
-                    "explainable_rankings"
+                    "explainable_rankings",
+                    "mcp_file_operations" if self.mcp_client else "direct_file_operations",
                 ]
             }
+            
+            # Add MCP stats if available
+            if self.mcp_client:
+                mcp_tools = self.mcp_client.list_tools()
+                agent_stats["mcp_server"] = {
+                    "tools_available": len(mcp_tools),
+                    "tool_names": [t["name"] for t in mcp_tools],
+                }
             
             return {
                 "rag_system": rag_stats,
@@ -820,6 +877,17 @@ class LangGraphMatchingAgent:
                 "status": "error",
                 "error": str(e)
             }
+
+    def shutdown(self) -> None:
+        """Clean up resources, including the MCP server subprocess."""
+        if self.mcp_client is not None:
+            logger.info("Shutting down MCP client")
+            self.mcp_client.stop()
+            self.mcp_client = None
+        if hasattr(self, "_checkpoint_connection") and self._checkpoint_connection:
+            self._checkpoint_connection.close()
+            self._checkpoint_connection = None
+        logger.info("Agent shutdown complete")
 
 
 # =============================================================================
@@ -1114,6 +1182,11 @@ def main():
         "--skip-ingest", action="store_true",
         help="Skip resume ingestion and use the existing vector index"
     )
+    parser.add_argument(
+        "--use-mcp", action="store_true",
+        help="Route file operations through the filesystem MCP server "
+             "instead of calling fs_tools directly"
+    )
     
     args = parser.parse_args()
     
@@ -1131,10 +1204,14 @@ def main():
     config["workflow"] = args.workflow
     if args.no_hitl:
         config["enable_hitl"] = False
+    if args.use_mcp:
+        config["use_mcp"] = True
     
     try:
         # Initialize agent
         print("🚀 Initializing LangGraph Matching Agent...")
+        if args.use_mcp:
+            print("🔌 MCP mode enabled — file operations will use the MCP server")
         agent = LangGraphMatchingAgent(
             config=config,
             checkpoint_db=args.checkpoint_db
@@ -1170,6 +1247,12 @@ def main():
     except Exception as e:
         print(f"❌ Agent initialization failed: {e}")
         return 1
+    finally:
+        # Ensure the MCP server subprocess is cleaned up.
+        try:
+            agent.shutdown()
+        except Exception:
+            pass
     
     return 0
 
