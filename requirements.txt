@@ -36,6 +36,13 @@ scikit-learn==1.7.2            # Machine learning utilities
 pytest==9.0.3                  # Testing framework
 pytest-cov==7.1.0              # Test coverage reporting
 
+# LangGraph and LangChain Dependencies (Part 3: Agent Architecture)
+langgraph==0.2.45              # Graph-based agent workflow orchestration
+langchain-core==0.3.23         # Core LangChain abstractions and base classes
+langchain-openai==0.2.13       # OpenAI integration for LangChain
+langchain-community==0.3.23    # Community integrations and tools
+langgraph-checkpoint-sqlite==2.0.4  # SQLite checkpointing for development
+
 # Additional Production Dependencies
 requests==2.33.1               # HTTP library for API calls
 certifi==2026.4.22             # SSL certificate verification
@@ -49,3 +56,6 @@ typing-extensions==4.15.0      # Type system extensions
 tqdm==4.67.3                   # Progress bars for loops
 click==8.3.3                   # Command line interface creation
 
+# MCP (Model Context Protocol) — Milestone 4
+mcp==2.3.0                     # MCP SDK for server + client (JSON-RPC 2.0 over stdio)
+grandalf==0.8                  # Graph layout engine (used by langchain draw_ascii)

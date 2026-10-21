@@ -1,630 +1,406 @@
 # LLM-Powered File System Assistant & RAG Job Matching System
 
-A comprehensive AI system combining file operations with advanced RAG (Retrieval-Augmented Generation) capabilities for intelligent job-resume matching. This project demonstrates both LLM function calling and semantic search technologies with production-ready implementation.
+A comprehensive AI system combining file operations, RAG-based resume matching, a LangGraph conversational agent, and MCP (Model Context Protocol) integration.
 
-## 📋 Project Overview
+## Project Overview
 
-This project demonstrates two major AI system implementations:
+The project is built across four phases, each building on the last:
 
-### **Phase 1: LLM Function Calling System**
-**Part A: Core File System Tools (60%)**
-- ✅ **read_file(filepath)** - Reads PDF, TXT, DOCX files with text extraction
-- ✅ **list_files(directory, extension)** - Lists files with optional filtering
-- ✅ **write_file(filepath, content)** - Creates files with automatic directory creation  
-- ✅ **search_in_file(filepath, keyword)** - Searches with context highlighting
+### Phase 1: LLM Function Calling System
+- **fs_tools.py** — File system operations: read_file, list_files, write_file, search_in_file (PDF, TXT, DOCX)
+- **llm_file_assistant.py** — OpenAI/OpenRouter integration with function calling for natural language file operations
 
-**Part B: LLM Integration (40%)**
-- ✅ **OpenAI/OpenRouter Integration** - Function calling with multiple AI models
-- ✅ **Natural Language Processing** - Handles assignment example queries
-- ✅ **Multi-step Workflows** - Executes complete tasks automatically
+### Phase 2: RAG Job Matching System
+- **resume_rag.py** — Document chunking, OpenAI embeddings, ChromaDB vector storage with section-aware metadata extraction
+- **job_matcher.py** — Hybrid scoring (semantic 40%, skills 25%, experience 15%, education 10%, keywords 10%) with explainable match reasoning
+- **test_rag_system.py** — End-to-end system testing and benchmarking
+- **rag_analysis.ipynb** — Jupyter notebook for performance analysis
 
-### **Phase 2: RAG Job Matching System** ⭐ **MAIN PROJECT**
-**Part A: RAG System Setup (50%)**
-- ✅ **Intelligent Document Chunking** - Section-aware resume processing (Education, Experience, Skills)
-- ✅ **Multi-Provider Embeddings** - OpenAI, SentenceTransformers, HuggingFace support
-- ✅ **Vector Database Storage** - ChromaDB with comprehensive metadata
-- ✅ **Advanced Metadata Extraction** - Name, skills, experience years, education, certifications
+### Phase 3: LangGraph Conversational Agent
+- **agent_workflow.py** — 19-node LangGraph state machine: intent classification, JD parsing, requirement extraction, semantic search, candidate ranking, report generation, human feedback loop, 3-round screening, candidate comparison, ranking explanation, interview question generation
+- **agent_state.py** — TypedDict state schema with 54 fields: conversation history (add_messages reducer), job requirements, candidate ranking (replace-semantics via `ranked_candidates`), refinement tracking, explainability reports, screening state
+- **explainability.py** — Deterministic explainability layer: per-candidate match reports with strengths and gaps, borderline detection with improvement suggestions, side-by-side comparison tables, head-to-head ranking explanations, ranking-delta computation for refinement transparency
+- **matching_agent.py** — Main entry point with CLI chat interface, checkpointer persistence, human-in-the-loop via `interrupt_before`, `--use-mcp` flag for MCP integration
+- **screening_pipeline.py** — 3-round progressive screening: initial screen (top 10), deep analysis (enhanced scoring), final recommendation (hire/no-hire with confidence)
+- **agent_tools.py** — 15 tools as LangChain StructuredTool functions: file ops, RAG search, job matching, requirement extraction, candidate comparison, interview questions
+- **simple_workflow.py** — Legacy 2-node agent/tools loop (selectable via `--workflow simple`)
+- **demo_matching_agent.py** — Single-turn demo queries
+- **test_matching_agent.py** — Unit and integration test suite
 
-**Part B: Job Matching Engine (50%)**
-- ✅ **Hybrid Search Algorithm** - Semantic + keyword matching with must-have filtering
-- ✅ **Multi-Component Scoring** - Weighted scoring system (semantic 40%, skills 25%, experience 15%, education 10%, keywords 10%)
-- ✅ **Match Reasoning Engine** - Explainable AI with detailed candidate analysis
-- ✅ **Production-Ready Output** - Standard JSON format with comprehensive match details
+### Phase 4: MCP Server Integration
+- **filesystem_mcp_server.py** — MCP server (JSON-RPC 2.0 over stdio) exposing 6 tools: read_file, list_files, write_file, search_in_file, watch_directory (change detection), batch_process (multi-file read/search/stats)
+- **mcp_client.py** — MCP client wrapper that spawns the server, discovers tools, and bridges them as LangChain StructuredTool objects
+- **mcp_test_scenarios.py** — 6 test scenarios covering tool discovery, file read, directory listing, watch_directory, batch_process, and the LangChain tool bridge
+- **demo_script.md** — Step-by-step demo video script for the conversational agent
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Prerequisites
-- Python 3.8 or higher
+### Prerequisites
+- Python 3.8+
 - OpenRouter API key (provides access to OpenAI, Anthropic, and other models)
 
-### 2. Installation
+### Installation
 
 ```bash
-# Clone or navigate to the project directory
 cd "LLM-Powered File System Assistant"
 
-# Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Configuration
+### Configuration
 
-Create a `.env` file with your API credentials:
+Create a `.env` file:
 
 ```bash
-# OpenRouter API Configuration
 OPENAI_API_KEY=sk-or-v1-your-openrouter-key-here
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
 ```
 
-**Note:** OpenRouter provides access to multiple AI models (OpenAI GPT, Anthropic Claude, Google Gemini, etc.) with a single API key.
+### Running the Systems
 
-### 4. Run the Systems
-
-#### **Option A: LLM File Assistant**
+#### Phase 1: LLM File Assistant
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Start the interactive assistant
 python llm_file_assistant.py
 ```
 
-#### **Option B: RAG Job Matching System**
+#### Phase 2: RAG Job Matching System
 ```bash
-# Run comprehensive system test
 python test_rag_system.py
-
-# Or run Jupyter analysis notebook
 jupyter notebook rag_analysis.ipynb
 ```
 
-## 💬 Usage Examples
-
-### **LLM File Assistant**
-The assistant handles natural language queries and automatically executes appropriate file operations:
-
-### Assignment Example Queries
-
+#### Phase 3: LangGraph Conversational Agent
 ```bash
-💬 You: Read all resumes in the resumes folder
-🤖 Assistant: [Lists files, reads each resume, presents complete analysis]
+# Interactive chat (recommended)
+python matching_agent.py --interactive --resume-dir examples/resumes
 
-💬 You: Find resumes mentioning Python experience  
-🤖 Assistant: [Lists resumes, searches each for "Python", shows matches with context]
+# Skip re-ingestion if vector DB already populated
+python matching_agent.py --interactive --skip-ingest
 
-💬 You: Create a summary file for resume_john_doe.pdf
-🤖 Assistant: [Reads the resume, creates formatted summary, saves to file]
+# Run without the human-feedback pause (runs straight through)
+python matching_agent.py --interactive --no-hitl --skip-ingest
+
+# Legacy simple workflow
+python matching_agent.py --interactive --workflow simple
+
+# Demo queries
+python demo_matching_agent.py --examples
+
+# Test suite
+python test_matching_agent.py
 ```
 
-### Additional Capabilities
-
+#### Phase 4: MCP Server Integration
 ```bash
-# File exploration
-"List all PDF files in the documents folder"
-"Show me all text files in the current directory"
+# Inspect the MCP server's tool catalogue
+python filesystem_mcp_server.py --inspect
 
-# Content analysis  
-"Find files mentioning machine learning"
-"Search for JavaScript experience across all resumes"
+# MCP client smoke test (starts server, calls each tool)
+python mcp_client.py
 
-# File creation
-"Create a comparison report of all candidates"
-"Write a summary of technical skills found in resumes"
+# Full MCP test scenarios (6 scenarios)
+python mcp_test_scenarios.py
+
+# Agent with MCP (file operations routed through MCP server)
+python matching_agent.py --interactive --use-mcp --skip-ingest
 ```
 
-### **RAG Job Matching System**
+## Usage Examples
+
+### Conversational Agent Queries
+
+```
+Find me candidates with Python and Django experience for a senior developer role, minimum 5 years
+```
+The agent classifies intent, parses the job description, extracts must-have vs nice-to-have requirements, searches the vector store semantically, ranks candidates with hybrid scoring, generates a report with strengths and gaps, then pauses for feedback.
+
+```
+also require AWS and raise the bar to 70%
+```
+At the feedback checkpoint, this refinement adds AWS as a hard requirement and raises the minimum score. The agent re-searches, re-ranks, and explains what changed (who dropped out, who moved up, score deltas).
+
+```
+Compare the top 3 matches side by side
+```
+Builds a side-by-side comparison table with score, verdict, hard-requirement coverage, preferred extras, experience and education status, plus a recommendation.
+
+```
+Why did the top candidate rank higher than the others?
+```
+Explains the score difference by attributing it to concrete factors: hard requirement coverage, skill overlap, experience alignment, preferred extras. Flags small gaps as noise.
+
+```
+Run the full screening process
+```
+Triggers 3-round progressive screening:
+- Round 1: initial screen narrows to top 10 by score threshold
+- Round 2: deep analysis with enhanced scoring (content depth, skill diversity, experience alignment)
+- Round 3: hire/no-hire recommendations with confidence levels, key strengths, next steps, and gap analysis for borderline finalists
+
+```
+Generate interview questions for the top candidate
+```
+Produces technical, behavioral, and situational questions tailored to the candidate's skills and experience gaps.
+
+### Chat Commands
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands and example queries |
+| `/stats` | Show system statistics (RAG chunks, tools, MCP status) |
+| `/reports` | Detailed match reports with strengths, gaps, improvement suggestions |
+| `/threads` | List conversation threads |
+| `/approve` | Approve current results at the feedback checkpoint |
+| `/refine <criteria>` | Adjust criteria and re-rank (e.g. `/refine also require React`) |
+| `/screen` | Run multi-round screening to a hire/no-hire call |
+| `/export` | Export conversation history to JSON |
+| `/clear` | Start a new conversation |
+| `/quit` | End the chat session |
+
+### MCP Server (Phase 4)
+
+```python
+from mcp_client import MCPClient
+
+# Start the MCP server and connect
+client = MCPClient()
+client.start()
+
+# Call MCP tools
+files = client.call_tool("list_files", {"directory": "examples/resumes", "extension": ".txt"})
+content = client.call_tool("read_file", {"filepath": "examples/resumes/john_doe_resume.txt"})
+changes = client.call_tool("watch_directory", {"directory": "examples/resumes", "extensions": [".txt"]})
+batch = client.call_tool("batch_process", {
+    "filepaths": ["examples/resumes/john_doe_resume.txt", "examples/resumes/sarah_smith_resume.txt"],
+    "operation": "search", "keyword": "Python"
+})
+
+# Get LangChain StructuredTool objects for the agent
+tools = client.get_tools()  # 6 tools with matching names/schemas
+
+client.stop()
+```
+
+### RAG Job Matching (Phase 2, direct API)
 
 ```python
 from resume_rag import ResumeRAG
 from job_matcher import JobMatcher
 
-# Initialize RAG system
 rag = ResumeRAG(vector_db="chromadb", embedding_model="openai")
-
-# Process resume directory
 rag.process_resume_directory("examples/resumes")
 
-# Initialize job matcher
-matcher = JobMatcher(rag)
-
-# Find matches for a job description
-job_description = """
-Senior Python Developer with 5+ years experience.
-Required: Python, Django, PostgreSQL, AWS
-Preferred: Machine Learning, Docker, Kubernetes
-"""
-
+matcher = JobMatcher(rag_system=rag)
 matches = matcher.find_matches(
-    job_description=job_description,
-    job_title="Senior Python Developer",
-    k=10
+    job_description=open("examples/job_descriptions/senior_python_developer.txt").read(),
+    job_title="Senior Python Developer", k=10, min_score=0.3
 )
 
-# Results include detailed match information
 for match in matches["top_matches"]:
     print(f"{match['candidate_name']}: {match['match_score']:.1f}%")
-    print(f"Skills: {', '.join(match['matched_skills'])}")
-    print(f"Reasoning: {match['reasoning']}")
+    print(f"  Skills: {', '.join(match['matched_skills'])}")
+    print(f"  Reasoning: {match['reasoning']}")
 ```
 
-**Example RAG Output:**
-```json
-{
-  "job_title": "Senior Python Developer",
-  "top_matches": [
-    {
-      "candidate_name": "John Doe",
-      "match_score": 92.3,
-      "matched_skills": ["Python", "Django", "PostgreSQL", "AWS", "Docker"],
-      "reasoning": "Strong technical skills match including Python, Django, AWS. Meets experience requirements. Excellent semantic alignment with job requirements.",
-      "relevant_excerpts": ["5+ years Python development...", "Django web applications..."]
-    }
-  ]
-}
-```
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 LLM-Powered File System Assistant/
-├── 📁 Core System Files
-│   ├── fs_tools.py              # File system operations (Part A)
-│   ├── llm_file_assistant.py    # LLM integration & chat interface (Part B)
-│   └── requirements.txt         # Python dependencies
+├── Phase 1: LLM Function Calling
+│   ├── fs_tools.py                    # File operations (read, list, write, search)
+│   └── llm_file_assistant.py          # LLM chat with function calling
 │
-├── 📁 RAG Job Matching System ⭐ MAIN PROJECT
-│   ├── resume_rag.py            # Document processing & vector storage (Part A - 50%)
-│   ├── job_matcher.py           # Semantic job matching engine (Part B - 50%)
-│   ├── test_rag_system.py       # Comprehensive system testing
-│   └── rag_analysis.ipynb       # Performance analysis & experimentation
+├── Phase 2: RAG Job Matching
+│   ├── resume_rag.py                   # Document chunking, embeddings, ChromaDB
+│   ├── job_matcher.py                 # Hybrid scoring and match reasoning
+│   ├── test_rag_system.py            # End-to-end testing
+│   ├── rag_analysis.ipynb            # Jupyter performance analysis
+│   └── rag_test_results.json         # Stored test results
 │
-├── 📁 Dataset (Exceeds Requirements)
-│   └── examples/
-│       ├── resumes/             # 30 diverse resume files (.txt format)
-│       │   ├── john_doe_resume.txt
-│       │   ├── sarah_smith_resume.txt
-│       │   ├── [... 28 more resumes]
-│       │   └── robert_wilson_resume.txt
-│       └── job_descriptions/    # 5 job description files (.txt format)
-│           ├── senior_python_developer.txt
-│           ├── data_scientist_ml.txt
-│           ├── devops_engineer.txt
-│           ├── cybersecurity_analyst.txt
-│           └── product_manager.txt
+├── Phase 3: LangGraph Agent
+│   ├── matching_agent.py              # Main entry point, CLI chat, MCP flag
+│   ├── agent_workflow.py              # 19-node LangGraph state machine
+│   ├── agent_state.py                # State schema (54 fields, reducers)
+│   ├── agent_tools.py                 # 15 LangChain StructuredTool functions
+│   ├── explainability.py             # Match reports, comparison, ranking deltas
+│   ├── screening_pipeline.py         # 3-round progressive screening
+│   ├── simple_workflow.py            # Legacy 2-node workflow (fallback)
+│   ├── demo_matching_agent.py        # Demo queries
+│   ├── demo_script.md                # Demo video script
+│   └── test_matching_agent.py        # Test suite
 │
-├── 📁 Configuration & Documentation
-│   ├── README.md               # This comprehensive documentation
-│   ├── .env                    # API configuration (create this)
-│   └── vector_db/             # ChromaDB storage (auto-created)
+├── Phase 4: MCP Integration
+│   ├── filesystem_mcp_server.py       # MCP server (JSON-RPC 2.0, 6 tools)
+│   ├── mcp_client.py                 # MCP client + LangChain tool bridge
+│   └── mcp_test_scenarios.py         # 6 MCP test scenarios
 │
-└── venv/                       # Virtual environment
+├── examples/
+│   ├── resumes/                      # 30 resume files (.txt)
+│   └── job_descriptions/             # 5 job description files (.txt)
+│
+├── .env                               # API credentials (gitignored)
+├── .gitignore
+├── requirements.txt                  # All dependencies including MCP
+├── vector_db/                        # ChromaDB storage (auto-created)
+└── venv/                             # Virtual environment
 ```
 
-## 🛠️ Core Components
+## Architecture
 
-### 🎯 **PRIMARY: RAG Job Matching System**
+### LangGraph Agent Workflow (Phase 3)
 
-#### resume_rag.py - Document Processing & Vector Storage
-```python
-from resume_rag import ResumeRAG, ResumeMetadata
+The graph has 19 nodes with conditional routing based on intent classification:
 
-# Initialize RAG system with multiple embedding options
-rag = ResumeRAG(
-    vector_db="chromadb",
-    embedding_model="openai",  # or "sentence-transformers"
-    collection_name="resume_collection"
-)
-
-# Process resume directory (intelligent chunking)
-stats = rag.process_resume_directory("examples/resumes")
-print(f"Processed {stats['total_files']} files, {stats['total_chunks']} chunks")
-
-# Semantic search
-results = rag.semantic_search("Python machine learning experience", k=10)
-for result in results:
-    print(f"{result['metadata']['resume_name']}: {result['similarity']:.3f}")
+```
+START -> classify_intent
+  |-- job_match  -> parse_job -> extract_requirements -> search_resumes
+  |                -> rank_candidates -> generate_report -> human_feedback_node
+  |                     |-- refine  -> adjust_criteria -> search_resumes (loop)
+  |                     |-- approve -> multi_round_screening -> deep_analysis
+  |                                   -> final_recommendation -> END
+  |-- hybrid    -> ingest_resumes -> index_check -> parse_job
+  |-- file_ops  -> file_agent <-> file_tools -> END
+  |-- compare   -> compare_candidates -> END
+  |-- explain   -> explain_ranking -> END
+  |-- questions -> generate_questions -> END
+  |-- screen    -> multi_round_screening -> deep_analysis -> final_recommendation
+  |-- refine    -> adjust_criteria -> search_resumes
+  |-- clarify   -> END
+  '-- error     -> handle_error -> END
 ```
 
-#### job_matcher.py - Intelligent Job Matching Engine
-```python
-from job_matcher import JobMatcher, JobRequirement
+Human-in-the-loop uses `interrupt_before=["human_feedback_node"]` (langgraph 0.2.45 pattern). The caller writes feedback via `update_state()`, then resumes with `invoke(None, config)`.
 
-# Initialize matcher with RAG system
-matcher = JobMatcher(rag_system=rag)
+State persistence via MemorySaver (default) or SqliteSaver (with `--checkpoint-db`).
 
-# Load job description
-job_desc = open("examples/job_descriptions/senior_python_developer.txt").read()
+### MCP Integration (Phase 4)
 
-# Find top matches with detailed scoring
-matches = matcher.find_matches(
-    job_description=job_desc,
-    job_title="Senior Python Developer",
-    k=10,
-    min_score=0.3
-)
+The agent's file operations can be routed through the MCP server instead of direct function calls:
 
-# Access detailed results
-for match in matches["top_matches"]:
-    print(f"Candidate: {match['candidate_name']}")
-    print(f"Score: {match['match_score']}/100")
-    print(f"Skills: {', '.join(match['matched_skills'])}")
-    print(f"Reasoning: {match['reasoning']}")
+```
+Agent (LangGraph)
+  |
+  |-- --use-mcp flag
+  |     v
+  MCPClient (mcp_client.py)
+  |   - spawns filesystem_mcp_server.py as subprocess
+  |   - connects via stdio (JSON-RPC 2.0)
+  |   - discovers tools via tools/list
+  |   - bridges as LangChain StructuredTool objects
+  v
+Filesystem MCP Server (filesystem_mcp_server.py)
+  |
+  |-- read_file      -> fs_tools.read_file()
+  |-- list_files     -> fs_tools.list_files()
+  |-- write_file     -> fs_tools.write_file()
+  |-- search_in_file -> fs_tools.search_in_file()
+  |-- watch_directory -> snapshot diff (added/modified/removed)
+  '-- batch_process  -> multi-file read/search/stats
 ```
 
-### 📊 **System Testing & Analysis**
+The graph structure is identical in both modes (19 nodes). When MCP is active, the `file_tools` ToolNode uses MCP-backed tools; when inactive, it uses the direct `agent_tools` functions.
 
-#### test_rag_system.py - Comprehensive Testing
-```python
-# Run complete system test
-python test_rag_system.py
+### Explainability Layer (Phase 3, Part C.2)
 
-# Includes:
-# - System initialization benchmarking
-# - Document processing performance
-# - Search accuracy evaluation  
-# - End-to-end matching workflow
-# - Performance metrics collection
-```
+`explainability.py` provides deterministic, LLM-free analysis:
 
-#### rag_analysis.ipynb - Advanced Analytics
-```python
-# Launch Jupyter notebook for:
-jupyter notebook rag_analysis.ipynb
+- **Match reports**: per-candidate strengths, gaps, must-have/nice-to-have coverage, experience assessment, improvement suggestions for borderline candidates (score 55-70)
+- **Comparison tables**: fixed-width side-by-side layout with score, verdict, coverage, experience, education
+- **Head-to-head explanation**: attributes score differences to hard requirement coverage, skill overlap, experience alignment, preferred extras
+- **Ranking deltas**: tracks entered/dropped/moved_up/moved_down candidates with score deltas and a narrative explaining what a refinement changed
 
-# Features:
-# - Interactive system exploration
-# - Performance visualization
-# - Parameter tuning experiments  
-# - Statistical analysis
-# - System optimization insights
-```
+## Assignment Completion Status
 
-### 🔧 **Supporting: LLM File Assistant**
+| Phase | Component | Requirement | Implementation | Status |
+|-------|-----------|-------------|----------------|--------|
+| 1 | Part A (60%) | File system tools | fs_tools.py — read_file, list_files, write_file, search_in_file | Done |
+| 1 | Part B (40%) | LLM integration | llm_file_assistant.py — OpenAI/OpenRouter function calling | Done |
+| 2 | Part A (50%) | RAG system | resume_rag.py — ChromaDB, OpenAI embeddings, section-aware chunking | Done |
+| 2 | Part B (50%) | Job matcher | job_matcher.py — hybrid scoring, 5-component weighted, explainable reasoning | Done |
+| 3 | Part A (40%) | Agent architecture | agent_workflow.py — 19-node LangGraph, agent_state.py — 54-field state, agent_tools.py — 15 tools | Done |
+| 3 | Part A (40%) | Graph structure | START -> Parse JD -> Extract Requirements -> Search -> Rank -> Report -> Human Feedback -> END | Done |
+| 3 | Part A (40%) | Custom tools | extract_requirements, compare_candidates, generate_interview_questions | Done |
+| 3 | Part B (30%) | Conversational interface | Natural language queries, CLI chat with /commands | Done |
+| 3 | Part B (30%) | Iterative refinement | Mid-conversation criteria adjustment, re-ranking with explained ranking deltas | Done |
+| 3 | Part C (30%) | Multi-round screening | 3-stage: initial screen, deep analysis, final hire/no-hire recommendation | Done |
+| 3 | Part C (30%) | Explainability | Match reports with strengths/gaps, improvement suggestions for borderline candidates | Done |
+| 4 | Part A (50%) | MCP server | filesystem_mcp_server.py — JSON-RPC 2.0, 6 tools, resource discovery | Done |
+| 4 | Part A (50%) | watch_directory | Snapshot diff: added/modified/removed files between calls | Done |
+| 4 | Part A (50%) | batch_process | Multi-file read/search/stats in one call | Done |
+| 4 | Part B (30%) | Agent refactoring | --use-mcp flag, MCP client integration, same functionality via MCP | Done |
+| 4 | — | Test scenarios | mcp_test_scenarios.py — 6 scenarios, all passing | Done |
+| 4 | — | Diagram | Mermaid auto-generated from compiled graph | Done |
+| — | — | Dataset | 30 resumes + 5 job descriptions | Done |
 
-#### fs_tools.py - File System Operations
-```python
-from fs_tools import read_file, list_files, write_file, search_in_file
-
-# Read any supported file type
-result = read_file("examples/resumes/john_doe_resume.txt")
-print(result['content'])  # Extracted text content
-
-# List and filter files
-files = list_files("examples/resumes", ".txt")
-print(f"Found {len(files)} resume files")
-
-# Search within files  
-matches = search_in_file("resume.txt", "Python")
-print(f"Found {matches['total_matches']} Python mentions")
-```
-
-#### llm_file_assistant.py - LLM Integration
-```python
-from llm_file_assistant import LLMFileAssistant
-
-# Initialize with OpenRouter
-assistant = LLMFileAssistant(
-    provider="openai",
-    model="openai/gpt-4o-mini"
-)
-
-# Process natural language queries
-result = assistant.process_query("Find all resumes mentioning Python")
-assistant.chat_session()  # Start interactive session
-```
-
-## 📊 Supported File Formats
+## Supported File Formats
 
 | Format | Library | Capabilities |
 |--------|---------|--------------|
-| **TXT** | Built-in | Full text extraction |
-| **PDF** | PyPDF2 | Text extraction from most PDFs |
-| **DOCX** | python-docx | Microsoft Word documents |
+| TXT | Built-in | Full text extraction |
+| PDF | PyPDF2 | Text extraction from most PDFs |
+| DOCX | python-docx | Microsoft Word documents |
 
-## 🎯 AI Model Options
+## Dependencies
 
-Through OpenRouter, you can access multiple AI models:
+Key dependencies (see `requirements.txt` for full pinned versions):
 
-- `openai/gpt-4o-mini` (fast, cost-effective)
-- `openai/gpt-4o` (most capable)  
-- `anthropic/claude-3-sonnet-20240229` (excellent reasoning)
-- `google/gemini-pro` (Google's flagship)
-- And many more...
+| Package | Purpose |
+|---------|---------|
+| langgraph | Graph-based agent workflow orchestration |
+| langchain-core | Tool abstractions, message types |
+| langchain-openai | OpenAI/OpenRouter LLM integration |
+| chromadb | Vector database for embeddings |
+| mcp | MCP SDK — server + client (JSON-RPC 2.0) |
+| grandalf | Graph layout for ASCII diagram rendering |
+| openai | OpenAI/OpenRouter API client |
+| PyPDF2 | PDF text extraction |
+| python-docx | DOCX text extraction |
 
-Change models by modifying the initialization:
-```python
-assistant = LLMFileAssistant(model="anthropic/claude-3-sonnet-20240229")
-```
-
-## 🧪 Testing the System
-
-### **RAG Job Matching System** ⭐ **PRIMARY TESTING**
-
-#### **Comprehensive System Test**
-```bash
-# Run complete end-to-end test
-python test_rag_system.py
-
-# Expected output:
-# ✅ RAG system initialized
-# ✅ Processed 30 resume files  
-# ✅ Generated 150+ document chunks
-# ✅ Job matching completed for 5 positions
-# ✅ Performance metrics collected
-# 📊 Average latency: <1.0 seconds
-# 📊 Average match score: 75.5%
-```
-
-#### **Interactive Jupyter Analysis**
-```bash
-# Launch advanced analysis notebook
-jupyter notebook rag_analysis.ipynb
-
-# Run all cells to see:
-# - System initialization and configuration
-# - Document processing statistics
-# - Job matching performance metrics
-# - Visualization dashboards
-# - Parameter tuning experiments
-# - System readiness assessment
-```
-
-#### **Quick RAG System Test**
-```python
-# Test basic functionality
-from resume_rag import ResumeRAG
-from job_matcher import JobMatcher
-
-# Initialize and test
-rag = ResumeRAG()
-rag.process_resume_directory("examples/resumes")
-matcher = JobMatcher(rag)
-
-# Test matching
-job_desc = open("examples/job_descriptions/senior_python_developer.txt").read()
-results = matcher.find_matches(job_desc, k=5)
-print(f"Found {len(results['top_matches'])} qualified candidates")
-```
-
-### **Supporting: LLM File Assistant Testing**
-
-#### **Test Core Functions**
-```bash
-# Test file system operations directly
-python -c "from fs_tools import *; print(len(list_files('examples/resumes')))"
-# Expected: 30 files listed
-```
-
-#### **Test LLM Integration**
-```bash
-# Run the assistant and try these queries:
-python llm_file_assistant.py
-
-# Test queries:
-"List all resume files"
-"Find candidates with Python skills"  
-"Create a summary of technical backgrounds"
-```
-
-### **Performance Benchmarks**
-- **Document Processing**: ~30 resumes in <10 seconds
-- **Search Latency**: <1.0 second per query
-- **Match Accuracy**: 75%+ average relevance scores
-- **System Coverage**: 100% query success rate
-
-## 📋 Dependencies
-
-### **Core Requirements**
-```txt
-# Document processing
-PyPDF2>=3.0.1              # PDF file reading
-python-docx>=0.8.11         # DOCX file reading
-python-dotenv>=1.0.0        # Environment variables
-
-# LLM API clients  
-openai>=1.12.0              # OpenAI/OpenRouter API client
-anthropic>=0.18.0           # Anthropic API client
-```
-
-### **RAG System Requirements** ⭐
-```txt
-# Vector Database and Embeddings
-chromadb>=0.4.0                 # Vector database for embeddings
-sentence-transformers>=2.2.0    # Local embedding models
-numpy>=1.21.0                   # Numerical operations
-
-# Data Analysis and Visualization
-pandas>=1.3.0                   # Data manipulation and analysis
-matplotlib>=3.5.0               # Plotting library
-seaborn>=0.11.0                 # Statistical data visualization
-jupyter>=1.0.0                  # Jupyter notebook support
-
-# Development and Testing
-pytest>=7.0.0                   # Testing framework
-pytest-cov>=4.0.0               # Coverage reporting
-```
-
-### **Installation**
-```bash
-# Install all dependencies at once
-pip install -r requirements.txt
-
-# Or install by category
-pip install PyPDF2 python-docx python-dotenv openai anthropic
-pip install chromadb sentence-transformers numpy pandas matplotlib seaborn jupyter
-pip install pytest pytest-cov
-```
-
-## 🔧 Configuration Options
+## Configuration
 
 ### Environment Variables
+
 ```bash
 # Required
 OPENAI_API_KEY=sk-or-v1-...           # OpenRouter API key
 OPENAI_BASE_URL=https://openrouter.ai/api/v1  # OpenRouter endpoint
-
-# Optional
-ANTHROPIC_API_KEY=sk-ant-...          # Direct Anthropic access
-LOG_LEVEL=INFO                        # Logging level
 ```
 
 ### Model Selection
-```python
-# In code or via initialization
-assistant = LLMFileAssistant(
-    provider="openai",                 # or "anthropic"
-    model="openai/gpt-4o-mini",       # OpenRouter model format
-    api_key="custom_key",             # Optional override
-    base_url="custom_endpoint"        # Optional override
-)
+
+The agent defaults to `gpt-4o-mini`. To use a different model via OpenRouter, pass a config file:
+
+```bash
+python matching_agent.py --interactive --config-file config.json --skip-ingest
 ```
 
-## 🐛 Troubleshooting
+where `config.json` contains:
+```json
+{"model": "openai/gpt-4o-mini"}
+```
 
-### Common Issues
+OpenRouter uses `provider/model` naming (e.g. `openai/gpt-4o-mini`, `anthropic/claude-3.5-sonnet`).
+
+## Troubleshooting
 
 **"No API key found"**
-```bash
-# Check your .env file exists and contains:
-OPENAI_API_KEY=sk-or-v1-your-key-here
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-```
+- Check `.env` exists and contains `OPENAI_API_KEY` and `OPENAI_BASE_URL`
 
-**"ModuleNotFoundError: No module named 'PyPDF2'"**
-```bash
-# Ensure virtual environment is activated and dependencies installed:
-source venv/bin/activate
-pip install -r requirements.txt
-```
+**"BaseTool.__call__() got an unexpected keyword argument"**
+- This was a langchain-core 0.3.x issue where `@tool` functions needed `.invoke()` instead of direct calls. Fixed in the current code — all tool calls use `.invoke({...})`.
 
-**"File not found" errors**
-```bash
-# Ensure you're running from the project root directory
-cd "LLM-Powered File System Assistant"
-python llm_file_assistant.py
-```
+**MCP server fails to start**
+- Ensure `mcp` is installed: `pip install mcp==2.3.0`
+- Check that `filesystem_mcp_server.py` is in the same directory as `mcp_client.py`
+- Run `python filesystem_mcp_server.py --inspect` to verify the server works standalone
 
-**Function calling not working**
-- Verify your OpenRouter API key is valid
-- Check that the base URL is set correctly
-- Try with a different model if issues persist
+**Agent pauses and never resumes**
+- The human-in-the-loop checkpoint pauses after report generation. Type `approve`, `refine <criteria>`, or use `/approve`, `/refine`, `/screen` commands.
+- To disable the pause entirely: `--no-hitl`
 
-## 📚 Learning Objectives Achieved
+**Resume ingestion takes too long**
+- Use `--skip-ingest` if the vector DB is already populated from a previous run
 
-### **🎯 RAG System Implementation (PRIMARY)**
-
-✅ **Document Chunking and Embedding**
-- ✅ Intelligent section-aware chunking preserving resume structure
-- ✅ Multi-provider embedding support (OpenAI, SentenceTransformers, HuggingFace)
-- ✅ Semantic meaningful chunk boundaries (Education, Experience, Skills)
-
-✅ **Build Vector Databases**
-- ✅ ChromaDB implementation with persistent storage
-- ✅ Comprehensive metadata storage alongside embeddings
-- ✅ Efficient similarity search and retrieval operations
-
-✅ **Create Retrieval Pipelines** 
-- ✅ End-to-end document processing pipeline
-- ✅ Hybrid search combining semantic and keyword matching
-- ✅ Advanced filtering and ranking algorithms
-
-✅ **Understand Semantic Search**
-- ✅ Vector similarity calculations and optimization
-- ✅ Multi-component scoring systems with weighted algorithms
-- ✅ Explainable AI with detailed match reasoning
-
-### **🔧 Supporting: LLM Function Calling**
-
-✅ **Understand LLM function calling/tool use**
-- Implemented structured tool interfaces with proper schemas
-- Demonstrated automatic tool selection based on user intent
-
-✅ **Implement structured tool interfaces**  
-- All functions follow consistent API patterns
-- Proper input validation and error handling
-- Structured return formats with metadata
-
-✅ **Handle file I/O operations programmatically**
-- Multiple file format support (PDF, TXT, DOCX)
-- Directory operations with filtering
-- Automatic path handling and directory creation
-
-✅ **Parse and validate documents**
-- Text extraction from various document formats
-- Content validation and error recovery
-- Advanced metadata extraction and processing
-
-## 🎖️ **Assignment Completion Status**
-
-| **Component** | **Requirement** | **Implementation** | **Status** |
-|---------------|-----------------|-------------------|------------|
-| **Part A: RAG System (50%)** | Document processing, chunking, embeddings, vector DB | `resume_rag.py` with advanced features | ✅ **EXCEEDED** |
-| **Part B: Job Matcher (50%)** | Semantic search, hybrid matching, scoring, reasoning | `job_matcher.py` with production features | ✅ **EXCEEDED** |
-| **Dataset Requirements** | 30+ resumes, 5+ job descriptions | 30 resumes + 5 job descriptions | ✅ **MET EXACTLY** |
-| **Output Format** | Specified JSON structure | Exact format compliance | ✅ **PERFECT MATCH** |
-| **Jupyter Analysis** | Experimentation and metrics | Comprehensive analysis notebook | ✅ **COMPREHENSIVE** |
-| **Performance Metrics** | Retrieval accuracy, latency | Advanced benchmarking suite | ✅ **ADVANCED** |
-
-### **🌟 Final Grade Assessment: A+ (EXCEEDS ALL EXPECTATIONS)**
-
-## 🚀 **Production Deployment & Scaling**
-
-This RAG system is production-ready and can be deployed in various environments:
-
-### **Deployment Options**
-```bash
-# Docker containerization
-docker build -t rag-job-matcher .
-docker run -p 8000:8000 rag-job-matcher
-
-# Cloud deployment (AWS/Azure/GCP)
-# - Vector database scaling with cloud-native solutions
-# - API endpoint deployment for job matching services
-# - Batch processing for large resume datasets
-```
-
-### **Performance Optimization**
-- **Embedding Caching**: Store computed embeddings for faster retrieval
-- **Parallel Processing**: Multi-threaded document processing  
-- **Vector Index Optimization**: Advanced indexing strategies for large datasets
-- **API Rate Limiting**: Production-grade request handling
-
-## 🤝 **Future Enhancements**
-
-Key areas for potential enhancement beyond assignment requirements:
-
-### **RAG System Improvements**
-1. **Multi-modal Processing** - Add support for image-based resumes and portfolios
-2. **Real-time Updates** - Live document processing and index updates
-3. **Advanced Analytics** - Candidate trend analysis and market insights
-4. **Integration APIs** - REST/GraphQL endpoints for external systems
-5. **Multi-language Support** - International resume processing capabilities
-
-### **LLM Assistant Enhancements** 
-1. **Additional File Formats** - Excel, PowerPoint, etc.
-2. **Advanced Search** - Regex patterns and fuzzy matching
-3. **Batch Operations** - Multi-file processing workflows
-4. **Web Interface** - Modern React/Vue.js frontend
-5. **Database Integration** - PostgreSQL/MongoDB backend
-
-## 📄 License
-
-This project is developed for educational purposes as part of an LLM Function Calling assignment.
-
-## 🙏 Acknowledgments
-
-- **OpenAI** for GPT models and function calling capabilities
-- **Anthropic** for Claude models  
-- **OpenRouter** for unified API access to multiple AI providers
-- **PyPDF2** and **python-docx** communities for document processing libraries
-
----
-
-**Ready to explore intelligent file operations with natural language commands!** 🚀
-
-For questions or issues, please ensure your environment is properly configured according to the setup instructions above.
