@@ -1,4 +1,4 @@
-# LLM-Powered File System Assistant & RAG Job Matching System
+# Agentic Recruitment Intelligence System
 
 A comprehensive AI system combining file operations, RAG-based resume matching, a LangGraph conversational agent, and MCP (Model Context Protocol) integration.
 
@@ -42,7 +42,7 @@ The project is built across four phases, each building on the last:
 ### Installation
 
 ```bash
-cd "LLM-Powered File System Assistant"
+cd "Agentic Recruitment Intelligence System"
 
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -208,7 +208,7 @@ for match in matches["top_matches"]:
 ## Project Structure
 
 ```
-LLM-Powered File System Assistant/
+Agentic Recruitment Intelligence System/
 ├── Phase 1: LLM Function Calling
 │   ├── fs_tools.py                    # File operations (read, list, write, search)
 │   └── llm_file_assistant.py          # LLM chat with function calling
